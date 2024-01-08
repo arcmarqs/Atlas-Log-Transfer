@@ -7,7 +7,7 @@ use atlas_common::ordering::Orderable;
 use atlas_core::log_transfer::networking::serialize::LogTransferMessage;
 use atlas_core::log_transfer::networking::signature_ver::LogTransferVerificationHelper;
 use atlas_core::ordering_protocol::loggable::PersistentOrderProtocolTypes;
-use atlas_core::ordering_protocol::networking::serialize::{OrderingProtocolMessage};
+use atlas_core::ordering_protocol::networking::serialize::OrderingProtocolMessage;
 use atlas_core::smr::networking::serialize::DecisionLogMessage;
 use atlas_smr_application::serialize::ApplicationData;
 
