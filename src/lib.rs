@@ -429,7 +429,7 @@ impl<D, OP, DL, NT, PL> LogTransferProtocol<D, OP, DL, NT, PL> for CollabLogTran
                         println!("fetching log {:?}, with first log seq {:?}", data.first_seq, first_log_seq);
                         warn!("fetching log {:?}, with first log seq {:?}", data.first_seq, first_log_seq);
                         if data.first_seq <= first_log_seq {
-                            if last_log_seq >= data.last_seq {
+                            if last_log_seq >= data.last_seq || log.first_seq().is_none() {
                                 info!("{:?} // Received log with sequence number {:?} and first sequence number {:?} from {:?}. Accepting log.",
                                         self.node.id(), log.sequence_number(), log.first_seq(), header.from());
 
