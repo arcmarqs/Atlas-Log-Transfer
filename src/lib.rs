@@ -427,6 +427,7 @@ impl<D, OP, DL, NT, PL> LogTransferProtocol<D, OP, DL, NT, PL> for CollabLogTran
 
                         let last_log_seq = log.sequence_number();
                         println!("fetching log {:?}, with first log seq {:?}", data.first_seq, first_log_seq);
+                        warn!("fetching log {:?}, with first log seq {:?}", data.first_seq, first_log_seq);
                         if data.first_seq <= first_log_seq {
                             if last_log_seq >= data.last_seq {
                                 info!("{:?} // Received log with sequence number {:?} and first sequence number {:?} from {:?}. Accepting log.",
