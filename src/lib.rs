@@ -446,7 +446,7 @@ impl<D, OP, DL, NT, PL> LogTransferProtocol<D, OP, DL, NT, PL> for CollabLogTran
                                 error!("{:?} // Received log with sequence number {:?} but expected {:?} or higher", self.node.id(), log.sequence_number(), last_log_seq);
                             }
                         } else {
-                            error!("{:?} // Received log with first sequence number {:?} but expected {:?} or lower", self.node.id(), log.first_seq(), first_log_seq);
+                            error!("{:?} // Received log with first sequence number {:?} but expected {:?} or lower", self.node.id(), log.first_seq(), data.first_seq);
                         }
                     }
                     _ => {
