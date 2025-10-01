@@ -423,12 +423,7 @@ impl<D, OP, DL, NT, PL> LogTransferProtocol<D, OP, DL, NT, PL> for CollabLogTran
                         // However, the ordering protocol is already at a SeqNo != 0, so we can't just say it's 0.
                         // On the other hand, this will probably never happen as the checkpoint would have to be available (digested) immediately
                         // (before the time it takes to do one consensus decisison) for the replica to get to that position.
-                        let first_log_seq = if log.first_seq().is_none() {
-                            info!("{:?} // Received empty log from {:?}. Accepting log.", self.node.id(), header.from());
-                            SeqNo::ZERO
-                        } else {
-                            log.first_seq().unwrap()
-                        };
+                        let first_log_seq = log.first_seq().unwrap_or(SeqNo::ZERO);
 
                         let last_log_seq = log.sequence_number();
 
@@ -441,16 +436,21 @@ impl<D, OP, DL, NT, PL> LogTransferProtocol<D, OP, DL, NT, PL> for CollabLogTran
 
                                 self.log_transfer_state = LogTransferState::Init;
 
-                                return Ok(LTResult::LTPFinished(first_log_seq, last_log_seq, requests_to_execute));
+                                return Ok(LTResult::LTPFinished(
+                                    first_log_seq,
+                                    last_log_seq,
+                                    requests_to_execute,
+                                ));
                             } else {
                                 error!("{:?} // Received log with sequence number {:?} but expected {:?} or higher", self.node.id(), log.sequence_number(), last_log_seq);
                             }
                         } else {
-                            error!("{:?} // Received log with first sequence number {:?} but expected {:?} or lower", self.node.id(), log.first_seq(), data.first_seq);
+                            error!("{:?} // Received log with first sequence number {:?} but expected {:?} or lower", self.node.id(), log.first_seq(), first_log_seq);
                         }
                     }
                     _ => {
-                        self.log_transfer_state = LogTransferState::FetchingLog(i, data, current_log);
+                        self.log_transfer_state =
+                            LogTransferState::FetchingLog(i, data, current_log);
 
                         // Drop messages that are not relevant to us at this time
                         return Ok(LTResult::Running);
@@ -459,7 +459,7 @@ impl<D, OP, DL, NT, PL> LogTransferProtocol<D, OP, DL, NT, PL> for CollabLogTran
 
                 let i = i + 1;
 
-                return if i == view.quorum() {
+                if i == view.quorum() {
                     self.log_transfer_state = LogTransferState::FetchingLog(i, data, current_log);
 
                     // If we get quorum messages and still haven't received a correct log, we need to request it again
@@ -468,7 +468,7 @@ impl<D, OP, DL, NT, PL> LogTransferProtocol<D, OP, DL, NT, PL> for CollabLogTran
                     self.log_transfer_state = LogTransferState::FetchingLog(i, data, current_log);
 
                     Ok(LTResult::Running)
-                };
+                }
             }
             LogTransferState::FetchingLogParts(_, _) => todo!()
         }
