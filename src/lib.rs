@@ -423,7 +423,12 @@ impl<D, OP, DL, NT, PL> LogTransferProtocol<D, OP, DL, NT, PL> for CollabLogTran
                         // However, the ordering protocol is already at a SeqNo != 0, so we can't just say it's 0.
                         // On the other hand, this will probably never happen as the checkpoint would have to be available (digested) immediately
                         // (before the time it takes to do one consensus decisison) for the replica to get to that position.
-                        let first_log_seq = log.first_seq().unwrap_or(SeqNo::ZERO);
+                        let first_log_seq = if log.first_seq().is_none() {
+                            info!("{:?} // Received empty log from {:?}. Accepting log.", self.node.id(), header.from());
+                            SeqNo::ZERO
+                        } else {
+                            log.first_seq().unwrap()
+                        };
 
                         let last_log_seq = log.sequence_number();
 
