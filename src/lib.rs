@@ -437,6 +437,7 @@ impl<D, OP, DL, NT, PL> LogTransferProtocol<D, OP, DL, NT, PL> for CollabLogTran
                             if last_log_seq >= data.last_seq {
                                 info!("{:?} // Received log with sequence number {:?} and first sequence number {:?} from {:?}. Accepting log.",
                                         self.node.id(), log.sequence_number(), log.first_seq(), header.from());
+                                println!("{:?} // Received log with sequence number {:?} and first sequence number {:?} from {:?}. Accepting log.",
 
                                 let requests_to_execute = decision_log.install_log(log)?;
 
@@ -452,6 +453,8 @@ impl<D, OP, DL, NT, PL> LogTransferProtocol<D, OP, DL, NT, PL> for CollabLogTran
                             }
                         } else {
                             error!("{:?} // Received log with first sequence number {:?} but expected {:?} or lower", self.node.id(), log.first_seq(), first_log_seq);
+                            println!("{:?} // Received log with first sequence number {:?} but expected {:?} or lower", self.node.id(), log.first_seq(), first_log_seq);
+
                         }
                     }
                     _ => {
