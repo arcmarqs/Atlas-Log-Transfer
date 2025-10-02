@@ -438,6 +438,7 @@ impl<D, OP, DL, NT, PL> LogTransferProtocol<D, OP, DL, NT, PL> for CollabLogTran
                                 info!("{:?} // Received log with sequence number {:?} and first sequence number {:?} from {:?}. Accepting log.",
                                         self.node.id(), log.sequence_number(), log.first_seq(), header.from());
                                 println!("{:?} // Received log with sequence number {:?} and first sequence number {:?} from {:?}. Accepting log.",
+                                        self.node.id(), log.sequence_number(), log.first_seq(), header.from());
 
                                 let requests_to_execute = decision_log.install_log(log)?;
 
