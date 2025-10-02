@@ -259,6 +259,7 @@ impl<D, OP, DL, NT, PL> LogTransferProtocol<D, OP, DL, NT, PL> for CollabLogTran
         let (header, message) = message.into_inner();
 
         debug!("{:?} // Off context Log Transfer Message {:?} from {:?} with seq {:?}", self.node.id(),message, header.from(), message.sequence_number());
+        println!("{:?} // Off context Log Transfer Message {:?} from {:?} with seq {:?}", self.node.id(),message, header.from(), message.sequence_number());
 
         match message.kind() {
             LogTransferMessageKind::RequestLogState => {
