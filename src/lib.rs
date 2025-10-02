@@ -424,7 +424,7 @@ impl<D, OP, DL, NT, PL> LogTransferProtocol<D, OP, DL, NT, PL> for CollabLogTran
                         // On the other hand, this will probably never happen as the checkpoint would have to be available (digested) immediately
                         // (before the time it takes to do one consensus decisison) for the replica to get to that position.
                         let cur_log =if let Some(log) = current_log {
-                            (log.first_seq(),log.sequence_number())
+                            Some((log.first_seq(),log.sequence_number()))
                         } else { None };
                         println!("received log {:?} {:?} current log {:?}", log.first_seq(), log.sequence_number(), cur_log);
                         let first_log_seq = log.first_seq().unwrap_or(SeqNo::ZERO);
