@@ -423,13 +423,15 @@ impl<D, OP, DL, NT, PL> LogTransferProtocol<D, OP, DL, NT, PL> for CollabLogTran
                         // However, the ordering protocol is already at a SeqNo != 0, so we can't just say it's 0.
                         // On the other hand, this will probably never happen as the checkpoint would have to be available (digested) immediately
                         // (before the time it takes to do one consensus decisison) for the replica to get to that position.
-                        let first_log_seq = log.first_seq().unwrap_or(SeqNo::ZERO);
 
+                        println!("received log {:?} {:?} current log {:?} {:?}", log.first_seq(), log.sequence_number(), current_log.unwrap_or(None).first_seq(),  current_log.unwrap_or(None).sequence_number());
+                        let first_log_seq = log.first_seq().unwrap_or(SeqNo::ZERO);
+                        
                         let last_log_seq = log.sequence_number();
                         println!("fetching log {:?}, with first log seq {:?}", data.first_seq, first_log_seq);
                         warn!("fetching log {:?}, with first log seq {:?}", data.first_seq, first_log_seq);
                         if data.first_seq <= first_log_seq {
-                            if last_log_seq >= data.last_seq || log.first_seq().is_none() {
+                            if last_log_seq >= data.last_seq {
                                 info!("{:?} // Received log with sequence number {:?} and first sequence number {:?} from {:?}. Accepting log.",
                                         self.node.id(), log.sequence_number(), log.first_seq(), header.from());
 
@@ -462,11 +464,12 @@ impl<D, OP, DL, NT, PL> LogTransferProtocol<D, OP, DL, NT, PL> for CollabLogTran
 
                 if i == view.quorum() {
                     self.log_transfer_state = LogTransferState::FetchingLog(i, data, current_log);
-
+                    println!("Should run log transfer");
                     // If we get quorum messages and still haven't received a correct log, we need to request it again
                     Ok(LTResult::RunLTP)
                 } else {
                     self.log_transfer_state = LogTransferState::FetchingLog(i, data, current_log);
+                    println!("fetching log");
 
                     Ok(LTResult::Running)
                 }
