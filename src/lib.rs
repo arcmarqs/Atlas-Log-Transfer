@@ -259,7 +259,6 @@ impl<D, OP, DL, NT, PL> LogTransferProtocol<D, OP, DL, NT, PL> for CollabLogTran
         let (header, message) = message.into_inner();
 
         debug!("{:?} // Off context Log Transfer Message {:?} from {:?} with seq {:?}", self.node.id(),message, header.from(), message.sequence_number());
-        println!("{:?} // Off context Log Transfer Message {:?} from {:?} with seq {:?}", self.node.id(),message, header.from(), message.sequence_number());
 
         match message.kind() {
             LogTransferMessageKind::RequestLogState => {
@@ -427,17 +426,13 @@ impl<D, OP, DL, NT, PL> LogTransferProtocol<D, OP, DL, NT, PL> for CollabLogTran
                         let cur_log =if let Some(log) = &current_log {
                             Some((log.first_seq(),log.sequence_number()))
                         } else { None };
-                        println!("received log {:?} {:?} current log {:?}", log.first_seq(), log.sequence_number(), cur_log);
                         let first_log_seq = log.first_seq().unwrap_or(SeqNo::ZERO);
                         
                         let last_log_seq = log.sequence_number();
-                        println!("fetching log {:?}, with first log seq {:?}", data.first_seq, first_log_seq);
                         warn!("fetching log {:?}, with first log seq {:?}", data.first_seq, first_log_seq);
                         if data.first_seq <= first_log_seq {
                             if last_log_seq >= data.last_seq {
                                 info!("{:?} // Received log with sequence number {:?} and first sequence number {:?} from {:?}. Accepting log.",
-                                        self.node.id(), log.sequence_number(), log.first_seq(), header.from());
-                                println!("{:?} // Received log with sequence number {:?} and first sequence number {:?} from {:?}. Accepting log.",
                                         self.node.id(), log.sequence_number(), log.first_seq(), header.from());
 
                                 let requests_to_execute = decision_log.install_log(log)?;
@@ -454,7 +449,6 @@ impl<D, OP, DL, NT, PL> LogTransferProtocol<D, OP, DL, NT, PL> for CollabLogTran
                             }
                         } else {
                             error!("{:?} // Received log with first sequence number {:?} but expected {:?} or lower", self.node.id(), log.first_seq(), first_log_seq);
-                            println!("{:?} // Received log with first sequence number {:?} but expected {:?} or lower", self.node.id(), log.first_seq(), first_log_seq);
 
                         }
                     }
@@ -471,12 +465,10 @@ impl<D, OP, DL, NT, PL> LogTransferProtocol<D, OP, DL, NT, PL> for CollabLogTran
 
                 if i == view.quorum() {
                     self.log_transfer_state = LogTransferState::FetchingLog(i, data, current_log);
-                    println!("Should run log transfer");
                     // If we get quorum messages and still haven't received a correct log, we need to request it again
                     Ok(LTResult::RunLTP)
                 } else {
                     self.log_transfer_state = LogTransferState::FetchingLog(i, data, current_log);
-                    println!("fetching log");
 
                     Ok(LTResult::Running)
                 }
