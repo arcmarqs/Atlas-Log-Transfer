@@ -102,12 +102,40 @@ impl<D, OP, DL, NT, PL> CollabLogTransfer<D, OP, DL, NT, PL>
         self.curr_seq
     }
 
+    /// Cleanup method to reduce memory usage during log transfer
+    fn cleanup_state(&mut self) {
+        match &mut self.log_transfer_state {
+            LogTransferState::FetchingSeqNo(_, ref mut data) => {
+                // Limit the size of received_initial_seq to prevent unbounded growth
+                if data.received_initial_seq.len() > 100 {
+                    // Keep only the most recent 50 entries
+                    let keys_to_remove: Vec<_> = data.received_initial_seq
+                        .keys()
+                        .take(data.received_initial_seq.len() - 50)
+                        .cloned()
+                        .collect();
+                    
+                    for key in keys_to_remove {
+                        data.received_initial_seq.remove(&key);
+                    }
+                }
+            }
+            LogTransferState::FetchingLogParts(_, ref mut data) => {
+                // Compact the log vector by removing None entries periodically
+                if data.log.len() > 1000 {
+                    data.log.retain(|opt| opt.is_some());
+                }
+            }
+            _ => {}
+        }
+    }
+
     fn request_entire_log<V>(&mut self, decision_log: &DL, view: V, fetch_data: FetchSeqNoData<PProof<D, OP::Serialization, OP::PersistableTypes>>) -> Result<()>
         where V: NetworkView {
         let next_seq = self.next_seq();
         let message = LTMessage::new(next_seq, LogTransferMessageKind::RequestLog);
 
-        self.node.broadcast(message, view.quorum_members().clone().into_iter());
+        let _ = self.node.broadcast(message, view.quorum_members().clone().into_iter());
 
         Ok(())
     }
@@ -132,7 +160,7 @@ impl<D, OP, DL, NT, PL> CollabLogTransfer<D, OP, DL, NT, PL>
 
         debug!("{:?} // Sending log state {:?} to {:?}", self.node.id(), message, header.from());
 
-        self.node.send(message, header.from(), true);
+        let _ = self.node.send(message, header.from(), true);
 
         Ok(())
     }
@@ -185,7 +213,7 @@ impl<D, OP, DL, NT, PL> CollabLogTransfer<D, OP, DL, NT, PL>
 
         let message = LTMessage::new(message.sequence_number(), message_kind);
 
-        self.node.send(message, header.from(), true);
+        let _ = self.node.send(message, header.from(), true);
 
         Ok(())
     }
@@ -244,7 +272,7 @@ impl<D, OP, DL, NT, PL> LogTransferProtocol<D, OP, DL, NT, PL> for CollabLogTran
 
         self.timeouts.timeout_lt_request(self.default_timeout, view.quorum() as u32, message.sequence_number());
 
-        self.node.broadcast(message, view.quorum_members().clone().into_iter());
+        let _ = self.node.broadcast(message, view.quorum_members().clone().into_iter());
 
         Ok(())
     }
@@ -335,6 +363,9 @@ impl<D, OP, DL, NT, PL> LogTransferProtocol<D, OP, DL, NT, PL> for CollabLogTran
 
         self.timeouts.received_log_request(header.from(), message.sequence_number());
 
+        // Perform periodic cleanup to prevent memory buildup
+        self.cleanup_state();
+
         let lt_state = std::mem::replace(&mut self.log_transfer_state, LogTransferState::Init);
 
         match lt_state {
@@ -418,38 +449,40 @@ impl<D, OP, DL, NT, PL> LogTransferProtocol<D, OP, DL, NT, PL> for CollabLogTran
             LogTransferState::FetchingLog(i, data, current_log) => {
                 match message.into_kind() {
                     LogTransferMessageKind::ReplyLog(log) => {
-                        //FIXME: Unwraping this first seq is not really the correct thing to do
-                        // as the log of the other replica might be empty because he has just checkpointed.
-                        // However, the ordering protocol is already at a SeqNo != 0, so we can't just say it's 0.
-                        // On the other hand, this will probably never happen as the checkpoint would have to be available (digested) immediately
-                        // (before the time it takes to do one consensus decisison) for the replica to get to that position.
-                        let cur_log =if let Some(log) = &current_log {
-                            Some((log.first_seq(),log.sequence_number()))
-                        } else { None };
-                        let first_log_seq = log.first_seq().unwrap_or(SeqNo::ZERO);
-                        
+                        // Handle the case where the log might be empty after checkpointing
                         let last_log_seq = log.sequence_number();
-                        warn!("fetching log {:?}, with first log seq {:?}", data.first_seq, first_log_seq);
-                        if data.first_seq <= first_log_seq {
-                            if last_log_seq >= data.last_seq {
-                                info!("{:?} // Received log with sequence number {:?} and first sequence number {:?} from {:?}. Accepting log.",
-                                        self.node.id(), log.sequence_number(), log.first_seq(), header.from());
-
-                                let requests_to_execute = decision_log.install_log(log)?;
-
-                                self.log_transfer_state = LogTransferState::Init;
-
-                                return Ok(LTResult::LTPFinished(
-                                    first_log_seq,
-                                    last_log_seq,
-                                    requests_to_execute,
-                                ));
-                            } else {
-                                error!("{:?} // Received log with sequence number {:?} but expected {:?} or higher", self.node.id(), log.sequence_number(), last_log_seq);
-                            }
+                        let first_log_seq_opt = log.first_seq();
+                        
+                        // Check if the received log can satisfy the requested range
+                        let log_satisfies_request = if let Some(first_log_seq) = first_log_seq_opt {
+                            // Log has entries - check if it covers the requested range
+                            warn!("fetching log {:?}, with first log seq {:?}", data.first_seq, first_log_seq);
+                            data.first_seq <= first_log_seq && last_log_seq >= data.last_seq
                         } else {
-                            error!("{:?} // Received log with first sequence number {:?} but expected {:?} or lower", self.node.id(), log.first_seq(), first_log_seq);
+                            // Log is empty (checkpointed) - check if the last sequence covers the request
+                            warn!("fetching log {:?}, received empty log with last seq {:?}", data.first_seq, last_log_seq);
+                            last_log_seq >= data.last_seq
+                        };
+                        
+                        if log_satisfies_request {
+                            info!("{:?} // Received log with sequence number {:?} and first sequence number {:?} from {:?}. Accepting log.",
+                                    self.node.id(), log.sequence_number(), first_log_seq_opt, header.from());
 
+                            let requests_to_execute = decision_log.install_log(log)?;
+
+                            self.log_transfer_state = LogTransferState::Init;
+
+                            return Ok(LTResult::LTPFinished(
+                                first_log_seq_opt.unwrap_or(data.first_seq),
+                                last_log_seq,
+                                requests_to_execute,
+                            ));
+                        } else {
+                            if let Some(first_log_seq) = first_log_seq_opt {
+                                error!("{:?} // Received log with first sequence number {:?} but expected {:?} or lower", self.node.id(), first_log_seq, data.first_seq);
+                            } else {
+                                error!("{:?} // Received empty log with last sequence {:?} but expected range {:?}-{:?}", self.node.id(), last_log_seq, data.first_seq, data.last_seq);
+                            }
                         }
                     }
                     _ => {
